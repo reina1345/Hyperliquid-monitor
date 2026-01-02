@@ -1,4 +1,4 @@
-import { SubscriptionClient } from '@nktkas/hyperliquid';
+import { SubscriptionClient, WebSocketTransport } from '@nktkas/hyperliquid';
 import { DiscordNotifier } from '../src/lib/discord/notifier';
 import { Position } from '../src/types/position';
 import dotenv from 'dotenv';
@@ -18,23 +18,23 @@ if (!walletAddress || !webhookUrl) {
   process.exit(1);
 }
 
-const notifier = new DiscordNotifier(webhookUrl);
-const client = new SubscriptionClient({ url: 'wss://api.hyperliquid.xyz/ws' });
+const transport = new WebSocketTransport();
+const client = new SubscriptionClient({ transport });
 
 console.log(`Starting background monitor for address: ${walletAddress}`);
 console.log('Waiting for fills (trades)...');
 
 async function main() {
+  if (!walletAddress) return;
   // 約定（Fills）の監視
-  await client.subscribe({ type: 'userFills', user: walletAddress });
+  // SDK v0.30+ ではメソッドベースのサブスクリプションを使用
+  await client.userFills({ user: walletAddress }, async (data) => {
+    // データが直接渡される場合がある (CustomEventのdetailではなく)
+    // エラーメッセージによると `event.detail` は存在せず、`event` 自体がデータオブジェクト
+    if (data.user !== walletAddress) return;
 
-  // イベントリスナー
-  client.on('userFills', async (event) => {
-    if (event.data.user !== walletAddress) return;
-
-    // 最新のFillデータ（通常は配列の最後の要素が最新か、あるいはdiffが来る）
-    // event.data.fills はそのイベントに含まれるFillのリスト
-    const fills = event.data.fills;
+    // data.fills はそのイベントに含まれるFillのリスト
+    const fills = data.fills;
 
     if (!fills || fills.length === 0) return;
 
