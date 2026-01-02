@@ -30,10 +30,15 @@ Next.jsベースのHyperliquidダッシュボードアプリケーションで�
    \`\`\`
 
 3. **環境変数の設定**
-   プロジェクトにはダミーの値が入った \`.env.local\` ファイルが含まれています。
-   このファイルを開き、`HYPERLIQUID_ACCOUNT_ADDRESS` をご自身の実際のウォレットアドレスに書き換えてください。
+   このプロジェクトにはデフォルト設定ファイル \`.env\` が含まれています。
+   ダウンロード後すぐに動作確認できますが、実際のデータを表示するには \`.env.local\` を作成して上書きすることをお勧めします。
 
-   \`.env.local\` の編集:
+   **.env.local の作成 (推奨):**
+   \`\`\`bash
+   cp .env.example .env.local
+   \`\`\`
+
+   作成した \`.env.local\` を開き、値を書き換えてください:
    \`\`\`env
    HYPERLIQUID_ACCOUNT_ADDRESS=あなたのウォレットアドレス (例: 0x...)
    DISCORD_WEBHOOK_URL=あなたのDiscord Webhook URL (任意)
