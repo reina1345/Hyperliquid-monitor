@@ -2,6 +2,7 @@
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { PositionList } from '@/components/dashboard/PositionList';
 import { AccountSummary } from '@/components/dashboard/AccountSummary';
+import OpenOrdersList from '@/components/OpenOrdersList';
 import { ModeToggle } from '@/components/theme-toggle';
 import { useState } from 'react';
 
@@ -56,6 +57,11 @@ function DashboardContent() {
           <>
             <section>
               <AccountSummary account={data.account} />
+            </section>
+
+            <section>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Open Orders</h2>
+              <OpenOrdersList />
             </section>
 
             <section>

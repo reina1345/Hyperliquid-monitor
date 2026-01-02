@@ -1,5 +1,6 @@
 import { InfoClient, HttpTransport } from '@nktkas/hyperliquid';
 import { Position, AccountSummary } from '@/types/position';
+import { OpenOrder } from '@/types/order';
 
 export class HyperliquidClient {
   private info: InfoClient;
@@ -92,5 +93,21 @@ export class HyperliquidClient {
       totalNtlPos: parseFloat(summary.totalNtlPos),
       withdrawable: parseFloat(userState.withdrawable),
     };
+  }
+
+  // オープン注文の取得
+  async getOpenOrders(): Promise<OpenOrder[]> {
+    const orders = await this.info.openOrders({ user: this.walletAddress });
+    return orders.map((order) => ({
+      coin: order.coin,
+      side: order.side,
+      limitPx: order.limitPx,
+      sz: order.sz,
+      oid: order.oid,
+      timestamp: order.timestamp,
+      origSz: order.origSz,
+      orderType: 'Limit', // The basic openOrders response might not have orderType, defaulting to 'Limit' or we can leave it generic
+      reduceOnly: order.reduceOnly,
+    }));
   }
 }
