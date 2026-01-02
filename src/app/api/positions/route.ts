@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
-import { HyperliquidClient } from '@/lib/hyperliquid/client';
+import { getHyperliquidClient } from '@/lib/hyperliquid/instance';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const client = new HyperliquidClient(process.env.HYPERLIQUID_ACCOUNT_ADDRESS!);
+    const client = getHyperliquidClient();
     const positions = await client.getAllPositions();
     const account = await client.getAccountSummary();
 

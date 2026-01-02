@@ -1,17 +1,11 @@
 import { NextResponse } from 'next/server';
-import { HyperliquidClient } from '@/lib/hyperliquid/client';
+import { getHyperliquidClient } from '@/lib/hyperliquid/instance';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const walletAddress = process.env.HYPERLIQUID_ACCOUNT_ADDRESS;
-
-  if (!walletAddress) {
-    return NextResponse.json({ error: 'Wallet address not configured' }, { status: 500 });
-  }
-
   try {
-    const client = new HyperliquidClient(walletAddress);
+    const client = getHyperliquidClient();
     const openOrders = await client.getOpenOrders();
     return NextResponse.json(openOrders);
   } catch (error) {
