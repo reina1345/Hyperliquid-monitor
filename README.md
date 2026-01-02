@@ -8,6 +8,7 @@ Next.jsベースのHyperliquidダッシュボードアプリケーションで�
 - **アカウントサマリー**: 口座残高、使用マージンなどの重要指標を表示
 - **Discord通知**: ポジションの変動や清算リスクをDiscordに通知（要設定）
 - **レスポンシブデザイン**: Tailwind CSSによるモダンなUI
+- **ダークモード**: 画面右上のトグルボタンでダークモード/ライトモードの切り替えが可能
 
 ## 必要要件
 
@@ -29,15 +30,13 @@ Next.jsベースのHyperliquidダッシュボードアプリケーションで�
    \`\`\`
 
 3. **環境変数の設定**
-   \`.env.local.example\` をコピーして \`.env.local\` を作成し、必要な値を入力します。
-   \`\`\`bash
-   cp .env.local.example .env.local
-   \`\`\`
+   プロジェクトにはダミーの値が入った \`.env.local\` ファイルが含まれています。
+   このファイルを開き、`HYPERLIQUID_ACCOUNT_ADDRESS` をご自身の実際のウォレットアドレスに書き換えてください。
 
    \`.env.local\` の編集:
    \`\`\`env
-   HYPERLIQUID_ACCOUNT_ADDRESS=あなたのウォレットアドレス
-   DISCORD_WEBHOOK_URL=あなたのDiscord Webhook URL
+   HYPERLIQUID_ACCOUNT_ADDRESS=あなたのウォレットアドレス (例: 0x...)
+   DISCORD_WEBHOOK_URL=あなたのDiscord Webhook URL (任意)
    \`\`\`
 
 4. **開発サーバーの起動**
