@@ -1,10 +1,8 @@
 import { SubscriptionClient, WebSocketTransport } from '@nktkas/hyperliquid';
-import { DiscordNotifier } from '../src/lib/discord/notifier';
-import { Position } from '../src/types/position';
 import dotenv from 'dotenv';
 import path from 'path';
 
-// 環境変数の読み込み (.env.local を優先、なければ .env)
+// Load environment variables
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 if (!process.env.HYPERLIQUID_ACCOUNT_ADDRESS) {
   dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -22,53 +20,129 @@ const transport = new WebSocketTransport();
 const client = new SubscriptionClient({ transport });
 
 console.log(`Starting background monitor for address: ${walletAddress}`);
-console.log('Waiting for fills (trades)...');
 
 async function main() {
   if (!walletAddress) return;
-  // 約定（Fills）の監視
-  // SDK v0.30+ ではメソッドベースのサブスクリプションを使用
-  await client.userFills({ user: walletAddress }, async (data) => {
-    // データが直接渡される場合がある (CustomEventのdetailではなく)
-    // エラーメッセージによると `event.detail` は存在せず、`event` 自体がデータオブジェクト
-    if (data.user !== walletAddress) return;
 
-    // data.fills はそのイベントに含まれるFillのリスト
-    const fills = data.fills;
+  // 1. Subscribe to Fills (Trades)
+  console.log('Subscribing to userFills...');
+  await client.userFills({ user: walletAddress }, async (data: any) => {
+    // Debug logging to understand data structure
+    // console.log('Raw userFills event:', JSON.stringify(data, null, 2));
 
-    if (!fills || fills.length === 0) return;
+    if (data.user && data.user !== walletAddress) return;
 
-    console.log(`Detected ${fills.length} new fill(s)!`);
+    // SDK unwraps the response, so 'data' might be the object containing 'fills'
+    // or 'data' itself might be the wrapper.
+    // Based on previous debugging, 'data' has 'fills' property.
+    const fills = data.fills || [];
 
-    for (const fill of fills) {
-        const side = fill.side === 'B' ? 'BUY (Long/CloseShort)' : 'SELL (Short/CloseLong)';
-        const size = parseFloat(fill.sz);
-        const price = parseFloat(fill.px);
-        const coin = fill.coin;
-        const value = size * price;
+    if (fills.length > 0) {
+        console.log(`Detected ${fills.length} fill(s).`);
+        for (const fill of fills) {
+            await handleFill(fill);
+        }
+    }
+  });
 
-        const message = `
+  // 2. Subscribe to Order Updates (Placements, Cancels, etc.)
+  console.log('Subscribing to orderUpdates...');
+  await client.orderUpdates({ user: walletAddress }, async (updates: any) => {
+    // console.log('Raw orderUpdates event:', JSON.stringify(updates, null, 2));
+
+    // Updates is an array of objects: { order, status, statusTimestamp }
+    if (Array.isArray(updates)) {
+        for (const update of updates) {
+            await handleOrderUpdate(update);
+        }
+    }
+  });
+
+  console.log('Monitoring active. Press Ctrl+C to exit.');
+}
+
+async function handleFill(fill: any) {
+    const side = fill.side === 'B' ? 'BUY' : 'SELL';
+    const size = parseFloat(fill.sz);
+    const price = parseFloat(fill.px);
+    const coin = fill.coin;
+    const value = size * price;
+
+    const message = `
 **Coin**: ${coin}
 **Side**: ${side}
-**Size**: ${size.toFixed(4)}
+**Size**: ${size}
 **Price**: $${price.toFixed(2)}
 **Value**: $${value.toFixed(2)}
 **Fee**: $${fill.fee}
-        `.trim();
+    `.trim();
 
-        await sendFillAlert(coin, side, size, price, message);
-    }
-  });
+    await sendDiscordAlert({
+        title: `🔔 Trade Executed: ${coin}`,
+        color: side === 'BUY' ? 0x00FF00 : 0xFF0000, // Green/Red
+        description: message
+    });
 }
 
-async function sendFillAlert(coin: string, side: string, size: number, price: number, description: string) {
-    const isBuy = side.includes('BUY');
-    const color = isBuy ? 0x00FF00 : 0xFF0000; // Green or Red
+async function handleOrderUpdate(update: any) {
+    const { order, status } = update;
+    const coin = order.coin;
+    const side = order.side === 'B' ? 'BUY' : 'SELL';
+    const limitPx = parseFloat(order.limitPx);
+    const size = parseFloat(order.sz);
+    const type = order.orderType; // "Limit", "Market", etc. (might be object)
 
+    // Parse order type string
+    let typeStr = 'Unknown';
+    if (typeof type === 'string') {
+        typeStr = type;
+    } else if (typeof type === 'object') {
+        typeStr = Object.keys(type)[0]; // e.g., { limit: ... } -> "limit"
+    }
+
+    let title = '';
+    let color = 0x808080; // Default Grey
+    let shouldNotify = false;
+
+    if (status === 'open') {
+        title = `📝 Order Opened: ${coin}`;
+        color = 0x3498db; // Blue
+        shouldNotify = true;
+    } else if (status === 'canceled') {
+        title = `🚫 Order Canceled: ${coin}`;
+        color = 0xff9900; // Orange
+        shouldNotify = true;
+    } else if (status === 'triggered') {
+        title = `⚠️ Order Triggered: ${coin}`;
+        color = 0xffff00; // Yellow
+        shouldNotify = true;
+    }
+    // We ignore 'filled' here because 'userFills' handles the trade details better (fees, etc.)
+    // If you want double notification, set shouldNotify = true for 'filled' too.
+
+    if (shouldNotify) {
+        const message = `
+**Type**: ${typeStr}
+**Side**: ${side}
+**Size**: ${size}
+**Price**: $${limitPx.toFixed(2)}
+**Status**: ${status.toUpperCase()}
+        `.trim();
+
+        await sendDiscordAlert({
+            title,
+            color,
+            description: message
+        });
+        console.log(`Notification sent for Order ${status}: ${coin}`);
+    }
+}
+
+async function sendDiscordAlert(payload: { title: string, color: number, description: string }) {
     const embed = {
-      title: `🔔 Fill Executed: ${coin}`,
-      color,
-      description: description,
+      title: payload.title,
+      color: payload.color,
+      description: payload.description,
       timestamp: new Date().toISOString(),
       footer: { text: 'Hyperliquid Monitor' },
     };
@@ -79,7 +153,6 @@ async function sendFillAlert(coin: string, side: string, size: number, price: nu
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ embeds: [embed] }),
       });
-      console.log(`Notification sent for ${coin}`);
     } catch (error) {
       console.error('Failed to send Discord notification:', error);
     }
